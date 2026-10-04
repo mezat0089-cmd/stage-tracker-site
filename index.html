@@ -277,6 +277,7 @@
     .brief th, .brief td { padding: 0.5rem 0.375rem; border-bottom: 1px solid var(--steel); text-align: left; vertical-align: top; }
     .brief thead th { font: 700 0.9375rem/1.1 var(--condensed); border-bottom: 2px solid var(--ink); }
     .brief tbody th { font: 700 1.0625rem/1.2 var(--condensed); overflow-wrap: anywhere; }
+    .brief tbody th small { display: block; color: var(--muted); font: 600 0.8125rem/1.2 var(--condensed); }
     .brief td { font-size: 0.9375rem; line-height: 1.25; }
     .brief td span { display: block; font-weight: 500; }
     .brief td small { color: var(--muted); }
@@ -547,7 +548,7 @@
         for (const stage of CONFIG.stages) times[stage.id] = cleanTime(row.times[stage.id] ?? '');
         if (Object.values(times).includes(null)) continue;
         seen.add(name.toLowerCase());
-        members.push({ name, times });
+        members.push({ id: typeof row.id === 'string' ? row.id.trim() : '', name, times });
       }
       return members.length ? { members } : null;
     }
@@ -601,13 +602,13 @@
     function buildBrief(schedule, rows, date, now) {
       const today = localDate(now);
       const nowMin = now.getHours() * 60 + now.getMinutes();
-      const members = schedule ? schedule.members.map((m) => ({ name: m.name, times: m.times })) : [];
+      const members = schedule ? schedule.members.map((m) => ({ id: m.id || '', name: m.name, times: m.times })) : [];
       const presses = {};
       for (const row of rows) {
         if (!row || row.date !== date || row.test === true || row.test === 'TRUE') continue;
         const key = `${row.member}\u0000${row.stage}`;
         if (!presses[key] || String(row.pressedAt) < String(presses[key].pressedAt)) presses[key] = row;
-        if (!members.some((m) => m.name === row.member)) members.push({ name: row.member, times: null });
+        if (!members.some((m) => m.name === row.member)) members.push({ id: '', name: row.member, times: null });
       }
       return members.map((m) => {
         const stages = {};
@@ -628,7 +629,7 @@
             stages[stage.id] = { status: due ? 'missed' : 'upcoming', scheduled };
           }
         }
-        return { member: m.name, stages };
+        return { id: m.id, member: m.name, stages };
       });
     }
 
@@ -817,7 +818,7 @@
         nameLabel.htmlFor = picker ? 'member' : 'name';
         if (!picker) return;
         memberSelect.innerHTML = '<option value="">Choose your name</option>'
-          + schedule.members.map((m) => `<option>${escapeHtml(m.name)}</option>`).join('');
+          + schedule.members.map((m) => `<option value="${escapeHtml(m.name)}">${escapeHtml(m.id ? `${m.id} – ${m.name}` : m.name)}</option>`).join('');
         memberSelect.value = currentMember() ? state.name : '';
       }
 
@@ -1018,7 +1019,7 @@
           const brief = S.buildBrief(schedule, rows, date, now());
           briefTable.tHead.rows[0].innerHTML = '<th scope="col">Member</th>'
             + S.CONFIG.stages.map((st) => `<th scope="col">${st.label}</th>`).join('');
-          briefTable.tBodies[0].innerHTML = brief.map((m) => `<tr><th scope="row">${escapeHtml(m.member)}</th>`
+          briefTable.tBodies[0].innerHTML = brief.map((m) => `<tr><th scope="row">${m.id ? `<small>${escapeHtml(m.id)}</small> ` : ''}${escapeHtml(m.member)}</th>`
             + S.CONFIG.stages.map((st) => briefCell(m.stages[st.id], st.label)).join('') + '</tr>').join('');
           if (!brief.length) briefMessage('No members yet. Add them in the Schedule tab of the team sheet.', 'bad');
           else briefMessage(`Updated ${S.formatTime(now())}.`, 'ok');
