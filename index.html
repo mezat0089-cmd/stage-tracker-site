@@ -244,6 +244,66 @@
     .setup li { margin-bottom: 0.5rem; }
     .setup p { color: var(--muted); margin: 0; }
     .stage-note.failed { color: var(--error); font-weight: 500; }
+    .fields select {
+      width: 100%;
+      min-height: 48px;
+      padding: 0 0.5rem;
+      border: 2px solid var(--ink);
+      border-radius: 4px;
+      background: var(--card);
+      color: var(--ink);
+      font: inherit;
+    }
+    .fields select[aria-invalid="true"] { border-color: var(--error); }
+
+    .brief-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem 0.75rem; }
+    .brief-controls label { font-weight: 500; }
+    .brief-controls input {
+      min-height: 48px;
+      padding: 0 0.625rem;
+      border: 2px solid var(--ink);
+      border-radius: 4px;
+      background: var(--card);
+      color: var(--ink);
+      font: inherit;
+    }
+    .brief-wrap { overflow-x: auto; margin-top: 1rem; }
+    .brief {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--card);
+      border: 2px solid var(--ink);
+    }
+    .brief th, .brief td { padding: 0.5rem 0.375rem; border-bottom: 1px solid var(--steel); text-align: left; vertical-align: top; }
+    .brief thead th { font: 700 0.9375rem/1.1 var(--condensed); border-bottom: 2px solid var(--ink); }
+    .brief tbody th { font: 700 1.0625rem/1.2 var(--condensed); overflow-wrap: anywhere; }
+    .brief td { font-size: 0.9375rem; line-height: 1.25; }
+    .brief td span { display: block; font-weight: 500; }
+    .brief td small { color: var(--muted); }
+    .brief td.done span { color: var(--stamp); }
+    .brief td.missed span { color: var(--error); }
+    .brief td.upcoming span, .brief td.none span { color: var(--muted); font-weight: 400; }
+    /* Phones: one card per member, stages in a 2×2 grid, each cell labelled. */
+    @media (max-width: 520px) {
+      .brief, .brief tbody { display: block; border: 0; background: none; }
+      .brief thead { display: none; }
+      .brief tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin-bottom: 0.75rem;
+        border: 2px solid var(--ink);
+        border-radius: 6px;
+        background: var(--card);
+      }
+      .brief tbody th { grid-column: 1 / -1; padding: 0.625rem 0.75rem; border-bottom: 2px solid var(--ink); }
+      .brief td { padding: 0.5rem 0.75rem; }
+      .brief td::before {
+        content: attr(data-label);
+        display: block;
+        color: var(--ink);
+        font: 600 0.875rem/1.3 var(--condensed);
+      }
+    }
     .retry {
       grid-column: 1;
       justify-self: start;
@@ -291,14 +351,16 @@
 
     <div class="tabs" role="tablist" aria-label="Sections">
       <button type="button" role="tab" id="tab-stages" aria-controls="panel-stages" aria-selected="true">Stages</button>
+      <button type="button" role="tab" id="tab-brief" aria-controls="panel-brief" aria-selected="false" tabindex="-1">Brief</button>
       <button type="button" role="tab" id="tab-settings" aria-controls="panel-settings" aria-selected="false" tabindex="-1">Settings</button>
     </div>
 
     <section id="panel-stages" role="tabpanel" aria-labelledby="tab-stages">
     <p class="setup-hint" id="setup-hint" hidden>First, add the team leader's WhatsApp number in the Settings tab.</p>
     <div class="fields">
-      <label for="name">Name</label>
+      <label for="name" id="name-label">Name</label>
       <input id="name" autocomplete="name" aria-describedby="field-error">
+      <select id="member" aria-describedby="field-error" hidden></select>
       <label for="task">Task</label>
       <input id="task" autocomplete="off" aria-describedby="field-error">
       <p class="field-error" id="field-error" role="alert"></p>
@@ -311,6 +373,21 @@
     </div>
     </section>
 
+    <section id="panel-brief" role="tabpanel" aria-labelledby="tab-brief" hidden>
+      <div class="brief-controls">
+        <label for="brief-date">Day</label>
+        <input type="date" id="brief-date">
+        <button type="button" class="action" id="brief-refresh">Refresh</button>
+      </div>
+      <p class="settings-status" id="brief-status" role="status"></p>
+      <div class="brief-wrap">
+        <table class="brief" id="brief-table">
+          <thead><tr><th scope="col">Member</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
     <section id="panel-settings" role="tabpanel" aria-labelledby="tab-settings" hidden>
       <form id="settings-form" class="settings" novalidate>
         <label for="leader-phone">Team leader's WhatsApp number</label>
@@ -318,6 +395,9 @@
         <label for="api-key">CallMeBot API key</label>
         <input id="api-key" autocomplete="off" spellcheck="false" aria-describedby="key-hint">
         <p class="hint" id="key-hint">With a key, stage updates send automatically. Without one, WhatsApp opens with the message ready to send.</p>
+        <label for="sheet-url">Team sheet link</label>
+        <input id="sheet-url" type="url" autocomplete="off" spellcheck="false" placeholder="https://script.google.com/macros/s/…/exec" aria-describedby="sheet-hint">
+        <p class="hint" id="sheet-hint">Optional. Connects everyone to the leader's Google Sheet: each member's own times, and the Brief tab.</p>
         <div class="settings-actions">
           <button type="submit" class="action primary">Save settings</button>
           <button type="button" class="action" id="test-message">Send test message</button>
@@ -332,6 +412,17 @@
           <li>The key arrives in a reply, usually within 2 minutes. Type it above and save.</li>
         </ol>
         <p>Messages then arrive from the CallMeBot contact. CallMeBot is a free third-party service, so keep task names free of confidential details.</p>
+      </details>
+      <details class="setup">
+        <summary>How the team leader connects a Google Sheet</summary>
+        <ol>
+          <li>Create a new Google Sheet, then open <strong>Extensions → Apps Script</strong>.</li>
+          <li>Replace the code there with the Stage Tracker script, save, choose <strong>setup</strong> and press <strong>Run</strong>. Allow access when Google asks.</li>
+          <li>In the sheet's <strong>Schedule</strong> tab, type each member's name and their four times, like 09:00.</li>
+          <li>Back in Apps Script: <strong>Deploy → New deployment → Web app</strong>, execute as <strong>Me</strong>, access <strong>Anyone</strong>. Copy the link that ends in <strong>/exec</strong>.</li>
+          <li>Paste that link above on every phone and save.</li>
+        </ol>
+        <p>Anyone with the link can read the schedule and add rows, so share it only with the team.</p>
       </details>
     </section>
   </main>
@@ -360,14 +451,15 @@
       return h * 60 + m;
     };
 
-    function stageStatuses(done, now) {
+    // unlocks: optional { stageId: 'HH:MM' } for one member; defaults to the CONFIG times.
+    function stageStatuses(done, now, unlocks) {
       const nowMin = now.getHours() * 60 + now.getMinutes();
       const result = {};
       let prevDone = true;
       for (const stage of CONFIG.stages) {
         if (done[stage.id]) result[stage.id] = 'done';
         else if (!prevDone) result[stage.id] = 'waiting';
-        else if (nowMin < toMinutes(stage.unlock)) result[stage.id] = 'locked';
+        else if (nowMin < toMinutes((unlocks && unlocks[stage.id]) || stage.unlock)) result[stage.id] = 'locked';
         else result[stage.id] = 'ready';
         prevDone = Boolean(done[stage.id]);
       }
@@ -409,12 +501,13 @@
     const SETTINGS_KEY = 'stageTracker.settings.v1';
 
     function loadSettings(storage) {
-      const settings = { phone: CONFIG.leaderPhone, apiKey: CONFIG.callMeBotKey };
+      const settings = { phone: CONFIG.leaderPhone, apiKey: CONFIG.callMeBotKey, sheetUrl: '' };
       try {
         const saved = JSON.parse(storage.getItem(SETTINGS_KEY));
         if (saved && typeof saved === 'object') {
           if (typeof saved.phone === 'string' && normalizePhone(saved.phone)) settings.phone = normalizePhone(saved.phone);
           if (typeof saved.apiKey === 'string') settings.apiKey = saved.apiKey.trim();
+          if (typeof saved.sheetUrl === 'string' && isSheetUrl(saved.sheetUrl)) settings.sheetUrl = saved.sheetUrl.trim();
         }
       } catch { /* fall back to CONFIG */ }
       return settings;
@@ -422,11 +515,121 @@
 
     function saveSettings(storage, settings) {
       try {
-        storage.setItem(SETTINGS_KEY, JSON.stringify({ phone: settings.phone, apiKey: settings.apiKey.trim() }));
+        storage.setItem(SETTINGS_KEY, JSON.stringify({
+          phone: settings.phone, apiKey: settings.apiKey.trim(), sheetUrl: (settings.sheetUrl || '').trim(),
+        }));
         return true;
       } catch {
         return false;
       }
+    }
+
+    // ---- Team sheet (Google Apps Script web app) ----
+
+    function isSheetUrl(text) {
+      return /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(String(text).trim());
+    }
+
+    function cleanTime(value) {
+      const match = /^(\d{1,2}):(\d{2})$/.exec(String(value).trim());
+      if (!match || Number(match[1]) > 23 || Number(match[2]) > 59) return null;
+      return `${pad(Number(match[1]))}:${match[2]}`;
+    }
+
+    function normalizeSchedule(json) {
+      if (!json || !Array.isArray(json.members)) return null;
+      const members = [];
+      const seen = new Set();
+      for (const row of json.members) {
+        const name = row && typeof row.name === 'string' ? row.name.trim() : '';
+        if (!name || seen.has(name.toLowerCase()) || !row.times) continue;
+        const times = {};
+        for (const stage of CONFIG.stages) times[stage.id] = cleanTime(row.times[stage.id] ?? '');
+        if (Object.values(times).includes(null)) continue;
+        seen.add(name.toLowerCase());
+        members.push({ name, times });
+      }
+      return members.length ? { members } : null;
+    }
+
+    function localDate(d) {
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function logRow(state, member, stageId, at, sent, test) {
+      return {
+        pressedAt: at.toISOString(),
+        date: localDate(at),
+        member,
+        task: state.task.trim(),
+        stage: stageId,
+        time: formatTime(at),
+        sent,
+        test: Boolean(test),
+      };
+    }
+
+    const OUTBOX_KEY = 'stageTracker.outbox.v1';
+
+    function readOutbox(storage) {
+      try {
+        const rows = JSON.parse(storage.getItem(OUTBOX_KEY));
+        return Array.isArray(rows) ? rows : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function queueLog(storage, row) {
+      try {
+        storage.setItem(OUTBOX_KEY, JSON.stringify([...readOutbox(storage), row]));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    // Removes and returns every queued row; the caller re-queues any that still fail.
+    function takeOutbox(storage) {
+      const rows = readOutbox(storage);
+      try { storage.setItem(OUTBOX_KEY, '[]'); } catch { return []; }
+      return rows;
+    }
+
+    // One entry per member: for each stage 'done' (time, diffMin vs schedule), 'missed' (due, not pressed),
+    // 'upcoming' (not due yet) or 'none' (member not in the schedule). Earliest press wins; test rows are ignored.
+    function buildBrief(schedule, rows, date, now) {
+      const today = localDate(now);
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const members = schedule ? schedule.members.map((m) => ({ name: m.name, times: m.times })) : [];
+      const presses = {};
+      for (const row of rows) {
+        if (!row || row.date !== date || row.test === true || row.test === 'TRUE') continue;
+        const key = `${row.member}\u0000${row.stage}`;
+        if (!presses[key] || String(row.pressedAt) < String(presses[key].pressedAt)) presses[key] = row;
+        if (!members.some((m) => m.name === row.member)) members.push({ name: row.member, times: null });
+      }
+      return members.map((m) => {
+        const stages = {};
+        for (const stage of CONFIG.stages) {
+          const press = presses[`${m.name}\u0000${stage.id}`];
+          const scheduled = m.times ? m.times[stage.id] : null;
+          if (press) {
+            stages[stage.id] = {
+              status: 'done',
+              time: press.time,
+              scheduled,
+              diffMin: scheduled ? toMinutes(press.time) - toMinutes(scheduled) : null,
+            };
+          } else if (!scheduled) {
+            stages[stage.id] = { status: 'none', scheduled: null };
+          } else {
+            const due = date < today || (date === today && nowMin >= toMinutes(scheduled));
+            stages[stage.id] = { status: due ? 'missed' : 'upcoming', scheduled };
+          }
+        }
+        return { member: m.name, stages };
+      });
     }
 
     function clockFromSearch(search, realNow) {
@@ -508,6 +711,7 @@
       CONFIG, stageStatuses, formatTime, formatDate, buildMessage, waLink, clockFromSearch, isTestClock,
       emptyState, loadState, saveState, markDone, markDelivery, resetTask, missingField,
       normalizePhone, loadSettings, saveSettings, callMeBotUrl,
+      isSheetUrl, normalizeSchedule, localDate, logRow, queueLog, takeOutbox, buildBrief,
     };
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     else root.Stages = api;
@@ -522,6 +726,11 @@
       let state = S.loadState(store);
       let settings = S.loadSettings(store);
       const sending = new Set(); // stages whose automatic message is in flight
+      const SCHEDULE_KEY = 'stageTracker.schedule.v1';
+      // The cached schedule only counts while a team sheet is configured.
+      let schedule = settings.sheetUrl
+        ? (() => { try { return S.normalizeSchedule(JSON.parse(store.getItem(SCHEDULE_KEY))); } catch { return null; } })()
+        : null;
       let freshStage = null; // only the stage pressed just now animates its stamp
       let lastRendered = ''; // skip rebuilding when nothing changed, so focus stays put
       const testClock = S.isTestClock(location.search);
@@ -530,6 +739,13 @@
       const taskInput = document.getElementById('task');
       const errorEl = document.getElementById('field-error');
       const list = document.getElementById('stages');
+      const memberSelect = document.getElementById('member');
+      const nameLabel = document.getElementById('name-label');
+
+      const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      // With a team sheet, the chosen member's own unlock times apply; otherwise the CONFIG times.
+      const currentMember = () => (schedule ? schedule.members.find((m) => m.name === state.name) || null : null);
+      const unlocks = () => (currentMember() ? currentMember().times : undefined);
 
       const now = () => S.clockFromSearch(location.search, new Date());
 
@@ -539,8 +755,8 @@
       }
 
       function render() {
-        const statuses = S.stageStatuses(state.done, now());
-        const signature = JSON.stringify([statuses, state.done, state.delivery, [...sending]]);
+        const statuses = S.stageStatuses(state.done, now(), unlocks());
+        const signature = JSON.stringify([statuses, state.done, state.delivery, [...sending], unlocks() || null]);
         if (signature === lastRendered) return;
         lastRendered = signature;
         const focused = document.activeElement;
@@ -569,7 +785,7 @@
           } else if (status === 'ready') {
             body = `<button type="button" class="send" data-send="${stage.id}">Send ${stage.label} update</button>`;
           } else if (status === 'locked') {
-            body = `<p class="stage-note">Opens at ${stage.unlock}</p>`;
+            body = `<p class="stage-note">Opens at ${(unlocks() || {})[stage.id] || stage.unlock}</p>`;
           } else {
             body = `<p class="stage-note">After ${S.CONFIG.stages[i - 1].label}</p>`;
           }
@@ -584,10 +800,66 @@
       }
 
       function showMissing(field) {
-        const input = field === 'name' ? nameInput : taskInput;
+        const picker = field === 'name' && schedule;
+        const input = field === 'name' ? (picker ? memberSelect : nameInput) : taskInput;
         input.setAttribute('aria-invalid', 'true');
-        errorEl.textContent = field === 'name' ? 'Enter your name first' : 'Enter the task name first';
+        errorEl.textContent = field === 'name'
+          ? (picker ? 'Choose your name first' : 'Enter your name first')
+          : 'Enter the task name first';
         input.focus();
+      }
+
+      // Show the member picker when a schedule is loaded, the free-text name box otherwise.
+      function syncMember() {
+        const picker = Boolean(schedule);
+        memberSelect.hidden = !picker;
+        nameInput.hidden = picker;
+        nameLabel.htmlFor = picker ? 'member' : 'name';
+        if (!picker) return;
+        memberSelect.innerHTML = '<option value="">Choose your name</option>'
+          + schedule.members.map((m) => `<option>${escapeHtml(m.name)}</option>`).join('');
+        memberSelect.value = currentMember() ? state.name : '';
+      }
+
+      // ---- Team sheet ----
+      function fetchSchedule() {
+        if (!settings.sheetUrl) return Promise.resolve(null);
+        return fetch(`${settings.sheetUrl}?action=schedule`)
+          .then((r) => r.json())
+          .then((json) => {
+            const loaded = S.normalizeSchedule(json);
+            if (loaded) {
+              schedule = loaded;
+              try { store.setItem(SCHEDULE_KEY, JSON.stringify(loaded)); } catch { /* cache is optional */ }
+              syncMember();
+              render();
+            }
+            return loaded;
+          })
+          .catch(() => null);
+      }
+
+      // Apps Script answers with a redirect we can't read in no-cors mode; a rejected fetch means offline.
+      function postRow(row) {
+        return fetch(settings.sheetUrl, {
+          method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(row),
+        }).then(() => true, () => false);
+      }
+
+      function logPress(stageId, at, sent) {
+        if (!settings.sheetUrl) return;
+        const row = S.logRow(state, state.name, stageId, at, sent, testClock);
+        postRow(row).then((ok) => { if (!ok) S.queueLog(store, row); });
+      }
+
+      let flushing = false;
+      function flushOutbox() {
+        if (!settings.sheetUrl || flushing) return;
+        const rows = S.takeOutbox(store);
+        if (!rows.length) return;
+        flushing = true;
+        rows.reduce((chain, row) => chain.then(() => postRow(row).then((ok) => { if (!ok) S.queueLog(store, row); })), Promise.resolve())
+          .then(() => { flushing = false; });
       }
 
       function clearError(input) {
@@ -645,7 +917,7 @@
           if (!settings.phone) return askForPhone(); // nothing is recorded until there is a number
           const id = send.dataset.send;
           // Re-check in case the page sat open past a state change.
-          if (S.stageStatuses(state.done, now())[id] !== 'ready') return render();
+          if (S.stageStatuses(state.done, now(), unlocks())[id] !== 'ready') return render();
           const at = now();
           state = S.markDone(state, id, at);
           if (!settings.apiKey) state = S.markDelivery(state, id, 'manual');
@@ -653,6 +925,7 @@
           freshStage = id;
           render();
           list.querySelector(`[data-resend="${id}"]`).focus();
+          logPress(id, at, settings.apiKey ? 'auto' : 'manual');
           if (settings.apiKey) sendAutomatically(id);
           else openWhatsApp(id, at);
         } else if (event.target.closest('[data-retry]')) {
@@ -666,6 +939,13 @@
         }
       });
 
+      memberSelect.addEventListener('change', () => {
+        state = { ...state, name: memberSelect.value };
+        S.saveState(store, state);
+        clearError(memberSelect);
+        render();
+      });
+
       document.getElementById('new-task').addEventListener('click', () => {
         if (!confirm('Start a new task? This clears all four stages.')) return;
         state = S.resetTask(state);
@@ -677,8 +957,13 @@
       });
 
       // Tabs
-      const tabs = { stages: document.getElementById('tab-stages'), settings: document.getElementById('tab-settings') };
-      const panels = { stages: document.getElementById('panel-stages'), settings: document.getElementById('panel-settings') };
+      const TAB_ORDER = ['stages', 'brief', 'settings'];
+      const tabs = {};
+      const panels = {};
+      for (const key of TAB_ORDER) {
+        tabs[key] = document.getElementById(`tab-${key}`);
+        panels[key] = document.getElementById(`panel-${key}`);
+      }
       function showTab(name) {
         for (const key of Object.keys(tabs)) {
           const on = key === name;
@@ -688,21 +973,69 @@
         }
       }
       tabs.stages.addEventListener('click', () => showTab('stages'));
+      tabs.brief.addEventListener('click', () => { showTab('brief'); loadBrief(); });
       tabs.settings.addEventListener('click', () => showTab('settings'));
       document.querySelector('[role="tablist"]').addEventListener('keydown', (event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-        const next = tabs.stages.getAttribute('aria-selected') === 'true' ? 'settings' : 'stages';
-        showTab(next);
+        const current = TAB_ORDER.findIndex((key) => tabs[key].getAttribute('aria-selected') === 'true');
+        const step = event.key === 'ArrowRight' ? 1 : TAB_ORDER.length - 1;
+        const next = TAB_ORDER[(current + step) % TAB_ORDER.length];
+        tabs[next].click();
         tabs[next].focus();
       });
+
+      // Brief
+      const briefDate = document.getElementById('brief-date');
+      const briefStatus = document.getElementById('brief-status');
+      const briefTable = document.getElementById('brief-table');
+      briefDate.value = S.localDate(now());
+      function briefMessage(text, kind = '') {
+        briefStatus.textContent = text;
+        briefStatus.className = `settings-status ${kind}`;
+      }
+      function briefCell(cell, label) {
+        const td = (kind, inner) => `<td class="${kind}" data-label="${label}">${inner}</td>`;
+        if (cell.status === 'done') {
+          const diff = cell.diffMin === null ? '' : ` <small>(${cell.diffMin >= 0 ? '+' : '−'}${Math.abs(cell.diffMin)}m)</small>`;
+          return td('done', `<span>${escapeHtml(cell.time)}</span>${diff}`);
+        }
+        if (cell.status === 'missed') return td('missed', `<span>Not pressed</span> <small>due ${cell.scheduled}</small>`);
+        if (cell.status === 'upcoming') return td('upcoming', `<span>Opens</span> <small>${cell.scheduled}</small>`);
+        return td('none', '<span>—</span>');
+      }
+      function loadBrief() {
+        if (!settings.sheetUrl) {
+          briefTable.tBodies[0].innerHTML = '';
+          return briefMessage('Add the team sheet link in Settings to see the brief.', 'bad');
+        }
+        const date = briefDate.value || S.localDate(now());
+        briefMessage('Loading…');
+        Promise.all([
+          fetchSchedule(),
+          fetch(`${settings.sheetUrl}?action=log&date=${encodeURIComponent(date)}`).then((r) => r.json()),
+        ]).then(([, json]) => {
+          const rows = json && Array.isArray(json.rows) ? json.rows : [];
+          const brief = S.buildBrief(schedule, rows, date, now());
+          briefTable.tHead.rows[0].innerHTML = '<th scope="col">Member</th>'
+            + S.CONFIG.stages.map((st) => `<th scope="col">${st.label}</th>`).join('');
+          briefTable.tBodies[0].innerHTML = brief.map((m) => `<tr><th scope="row">${escapeHtml(m.member)}</th>`
+            + S.CONFIG.stages.map((st) => briefCell(m.stages[st.id], st.label)).join('') + '</tr>').join('');
+          if (!brief.length) briefMessage('No members yet. Add them in the Schedule tab of the team sheet.', 'bad');
+          else briefMessage(`Updated ${S.formatTime(now())}.`, 'ok');
+        }).catch(() => briefMessage("Couldn't load the brief. Check the connection and the team sheet link.", 'bad'));
+      }
+      document.getElementById('brief-refresh').addEventListener('click', loadBrief);
+      briefDate.addEventListener('change', loadBrief);
 
       // Settings
       const phoneInput = document.getElementById('leader-phone');
       const keyInput = document.getElementById('api-key');
+      const sheetInput = document.getElementById('sheet-url');
       const settingsStatus = document.getElementById('settings-status');
       function syncSettings() {
         phoneInput.value = settings.phone ? '+' + settings.phone : '';
         keyInput.value = settings.apiKey;
+        sheetInput.value = settings.sheetUrl;
         document.getElementById('setup-hint').hidden = Boolean(settings.phone);
       }
 
@@ -716,6 +1049,7 @@
         settingsStatus.className = `settings-status ${kind}`;
       }
       phoneInput.addEventListener('input', () => phoneInput.removeAttribute('aria-invalid'));
+      sheetInput.addEventListener('input', () => sheetInput.removeAttribute('aria-invalid'));
       document.getElementById('settings-form').addEventListener('submit', (event) => {
         event.preventDefault();
         const phone = S.normalizePhone(phoneInput.value);
@@ -724,10 +1058,28 @@
           phoneInput.focus();
           return settingsMessage('Enter the full phone number with country code, like +20 1xx xxx xxxx.', 'bad');
         }
-        settings = { phone, apiKey: keyInput.value.trim() };
+        const sheetUrl = sheetInput.value.trim();
+        if (sheetUrl && !S.isSheetUrl(sheetUrl)) {
+          sheetInput.setAttribute('aria-invalid', 'true');
+          sheetInput.focus();
+          return settingsMessage("That team sheet link isn't right. Paste the web app link from Apps Script; it ends in /exec.", 'bad');
+        }
+        settings = { phone, apiKey: keyInput.value.trim(), sheetUrl };
         syncSettings();
-        if (S.saveSettings(store, settings)) settingsMessage('Settings saved.', 'ok');
-        else settingsMessage('Saved for this visit only: this browser blocks saving.', 'bad');
+        const saved = S.saveSettings(store, settings)
+          ? 'Settings saved.' : 'Saved for this visit only: this browser blocks saving.';
+        if (!sheetUrl) {
+          schedule = null;
+          try { store.setItem(SCHEDULE_KEY, 'null'); } catch { /* cache is optional */ }
+          syncMember();
+          render();
+          return settingsMessage(saved, 'ok');
+        }
+        settingsMessage(`${saved} Loading the team schedule…`, '');
+        fetchSchedule().then((loaded) => {
+          if (loaded) settingsMessage(`${saved} Found ${loaded.members.length} members in the team sheet.`, 'ok');
+          else settingsMessage(`${saved} But the team sheet could not be read. Check the link, and that the script is deployed for "Anyone".`, 'bad');
+        });
       });
       document.getElementById('test-message').addEventListener('click', () => {
         if (!settings.phone) return askForPhone();
@@ -739,9 +1091,12 @@
         });
       });
 
-      setInterval(render, 30000);
+      setInterval(() => { render(); flushOutbox(); }, 30000);
       document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible') render();
+        if (document.visibilityState !== 'visible') return;
+        render();
+        flushOutbox();
+        fetchSchedule();
       });
 
       if (testClock) {
@@ -751,7 +1106,10 @@
       }
       syncFields();
       syncSettings();
+      syncMember();
       render();
+      fetchSchedule();
+      flushOutbox();
     })();
   </script>
 </body>
